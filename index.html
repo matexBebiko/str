@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalendarz</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f0f0; margin: 0; padding: 0;}
+        .glowna { display: none; padding: 20px; }
+        .logowanie { display: block; text-align: center; margin-top: 100px; }
+        .log input { margin: 5px; padding: 8px; border-radius: 5px; border: 1px solid #888; }
+        header, footer { text-align: center; margin-bottom: 20px; }
+        .kalendarz {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            max-width: 700px;
+            margin: 0 auto 20px auto;
+        }
+        .day {
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: 0.2s;
+        }
+        .day:hover { background: #eef; }
+        .day.zadanie { background: #d7ffd7; }
+        #task-panel {
+            max-width: 700px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        #task-panel h2 { margin-top: 0; }
+        #task-panel ul { list-style: none; padding: 0; }
+        #task-panel li { display: flex; justify-content: space-between; margin: 5px 0; }
+        #task-panel li span { cursor: pointer; }
+        #task-panel button { margin-left: 5px; cursor: pointer; }
+        input[type="button"] { padding: 5px 10px; cursor: pointer; border-radius: 5px; border: 1px solid #888; background: #eee; transition: 0.2s; }
+        input[type="button"]:hover { background: #ddd; }
+        /* Podstawowy wygląd kalendarza już masz */
+
+        @media (max-width: 768px) { /* Tablet */
+            .kalendarz {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 4px;
+            }
+            .day {
+                padding: 12px;
+                font-size: 14px;
+            }
+            #task-panel {
+                padding: 12px;
+            }
+        }
+
+        @media (max-width: 480px) { /* Telefon */
+            .kalendarz {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 3px;
+            }
+            .day {
+                padding: 10px;
+                font-size: 13px;
+            }
+            #task-panel {
+                padding: 10px;
+            }
+            input[type="text"], input[type="button"] {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="logowanie">
+        <div class="log">
+            <input type="password" class="pasw" placeholder="Hasło">
+            <input type="button" class="zalogujBtn" value="Zaloguj">
+        </div>
+    </div>
+
+    <div class="glowna">
+        <header>
+            <h1>Plan Hani🤠</h1>
+            <input type="button" value="Wyloguj" class="wyloguj">
+        </header>
+        <main>
+            <div class="kalendarz"></div>
+            <div id="task-panel">
+                <h2 id="selected-date">Zadania</h2>
+                <input type="text" id="new-task" placeholder="Nowe zadanie...">
+                <ul id="task-list"></ul>
+            </div>
+        </main>
+        <footer>
+            <h6>Stronę wykonał: MatiBebiko</h6>
+        </footer>
+    </div>
+
+    <script>
+        // --- Logowanie / wylogowanie ---
+        const btn = document.querySelector(".zalogujBtn");
+        const btnWylog = document.querySelector(".wyloguj");
+        const pasw = document.querySelector(".pasw");
+        const divLog = document.querySelector(".logowanie");
+        const divMain = document.querySelector(".glowna");
+
+        btn.addEventListener("click", ()=>{
+            if(pasw.value === "henkel1234"){
+                divLog.style.display = "none";
+                divMain.style.display = "block";
+            }else{
+                alert("Hasło niepoprawne");
+            }
+        });
+
+        btnWylog.addEventListener("click", ()=>{
+            divLog.style.display = "block";
+            divMain.style.display = "none";
+        });
+
+        // --- Kalendarz ---
+        const kalendarzDiv = document.querySelector(".kalendarz");
+        const taskPanel = document.getElementById("task-panel");
+        const selectedDateEl = document.getElementById("selected-date");
+        const taskList = document.getElementById("task-list");
+        const newTaskInput = document.getElementById("new-task");
+
+        let now = new Date();
+        let year = now.getFullYear();
+        let month = now.getMonth(); // 0 = styczeń
+        let plan = JSON.parse(localStorage.getItem("plan")) || {};
+        let selectedDate = null;
+
+        function generujKalendarz(y, m) {
+            kalendarzDiv.innerHTML = "";
+            const firstDay = new Date(y, m, 1).getDay();
+            const daysInMonth = new Date(y, m + 1, 0).getDate();
+            const offset = firstDay === 0 ? 6 : firstDay -1;
+
+            // puste miejsca przed pierwszym dniem
+            for(let i=0;i<offset;i++){
+                const empty = document.createElement("div");
+                kalendarzDiv.appendChild(empty);
+            }
+
+            // generowanie dni
+            for(let day=1; day<=daysInMonth; day++){
+                const div = document.createElement("div");
+                div.textContent = day;
+                div.classList.add("day");
+
+                const dateKey = `${y}-${m+1}-${day}`;
+                if(plan[dateKey] && plan[dateKey].length>0) div.classList.add("zadanie");
+
+                div.addEventListener("click", ()=>openTaskPanel(dateKey));
+                kalendarzDiv.appendChild(div);
+            }
+        }
+
+        function openTaskPanel(dateKey){
+            selectedDate = dateKey;
+            selectedDateEl.textContent = `Zadania na ${dateKey}`;
+            taskPanel.style.display = "block";
+            renderTasks();
+        }
+
+        function renderTasks(){
+            taskList.innerHTML = "";
+            const currentTasks = plan[selectedDate] || [];
+            currentTasks.forEach((task, i)=>{
+                const li = document.createElement("li");
+                const span = document.createElement("span");
+                span.textContent = task.text;
+                if(task.done) span.style.textDecoration = "line-through";
+                span.addEventListener("click", ()=>{
+                    task.done = !task.done;
+                    saveTasks();
+                    renderTasks();
+                    generujKalendarz(year, month);
+                });
+
+                const editBtn = document.createElement("button");
+                editBtn.textContent = "✏️";
+                editBtn.addEventListener("click", ()=>{
+                    const newText = prompt("Edytuj zadanie:", task.text);
+                    if(newText){
+                        task.text = newText;
+                        saveTasks();
+                        renderTasks();
+                        generujKalendarz(year, month);
+                    }
+                });
+
+                const delBtn = document.createElement("button");
+                delBtn.textContent = "🗑️";
+                delBtn.addEventListener("click", ()=>{
+                    currentTasks.splice(i,1);
+                    saveTasks();
+                    renderTasks();
+                    generujKalendarz(year, month);
+                });
+
+                li.append(span, editBtn, delBtn);
+                taskList.appendChild(li);
+            });
+        }
+
+        function saveTasks(){
+            localStorage.setItem("plan", JSON.stringify(plan));
+        }
+
+        newTaskInput.addEventListener("keypress", e=>{
+            if(e.key==="Enter" && newTaskInput.value.trim() && selectedDate){
+                plan[selectedDate] = plan[selectedDate] || [];
+                plan[selectedDate].push({text:newTaskInput.value, done:false});
+                newTaskInput.value = "";
+                saveTasks();
+                renderTasks();
+                generujKalendarz(year, month);
+            }
+        });
+
+        generujKalendarz(year, month);
+    </script>
+</body>
+</html>
